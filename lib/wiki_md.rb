@@ -7,23 +7,34 @@ require 'dxsectionx'
 
 
 class WikiMd
+  include RXFHelperModule
   
-  def initialize(wiki=nil)
+  attr_reader :active_heading
+  
+  def initialize(wiki=nil, debug: false)
+    
+    @debug = debug
     
     if wiki then
-      s, _ = RXFHelper.read(wiki)
-      @dxsx = DxSectionX.new s
+      s, type = RXFHelper.read(wiki, auto: false)
+      @filename = wiki if type == :file or type == :dfs
+      puts 's: ' + s.inspect if @debug
+      @dxsx = DxSectionX.new s, debug: debug
     else
       
       new_md()
       
-    end        
-    
+    end
+            
   end
   
+  
   def create_section(s)
+    @active_heading = s[/(?<=^# ).*/]
     @dxsx.create(x: s)
   end
+  
+  alias add_section create_section
   
   def delete_section(q)
     
@@ -37,10 +48,21 @@ class WikiMd
   
   def find(q)
     
+    puts 'WikiMd::find q: ' + q.inspect if @debug
     return @dxsx.dx.find q if q =~ /^\d+$/
     regex = q.is_a?(String) ? /#{q}/i : q
-    @dxsx.dx.all.find {|section| section.x =~ regex }
+    r = @dxsx.dx.all.find {|section| section.x.lines.first =~ regex }
+    puts '  r: ' + r.inspect if @debug
+    return unless r
+    
+    heading2 = r.x.lines.last[/(?<=redirect ).*/]
+    heading2 ? find(heading2) : r
+    
   end  
+  
+  def headings()
+    @dxsx.dx.all.map {|section| section.x.lines.first.chomp[/(?<=# ).*/] }
+  end
   
   def new_md(x=nil)
     
@@ -61,6 +83,15 @@ EOF
   end
   
   alias import new_md 
+  
+  def read_section(heading)
+    section = find heading
+    section.x if section
+  end
+  
+  def save(filename=@filename)
+    FileX.write filename, @dxsx.to_s
+  end
   
   def title()
     @dxsx.dx.title()
@@ -89,12 +120,20 @@ EOF
   
   def update_section(*args)
     
+    puts 'inside update_section' if @debug
+    
     val, raw_q = args.reverse
+    puts '  val: ' + val.inspect if @debug
+    puts '  raw_q: '  + raw_q.inspect if @debug
+    q = raw_q ? raw_q : val.lines.first[/(?<=^# ).*/]
     
-    q = raw_q ? raw_q : val.lines.first
+    puts '  q: ' + q.inspect if @debug
+    @section = r = find(q)
+    return false unless r
     
-    r = find(q)
-    r.x = val =~ /# / ? val : r.x.lines.first + "\n" + val
+    content = val =~ /# / ? val : r.x.lines.first + "\n" + val
+    @active_heading = content[/(?<=^# ).*/]
+    r.x = content
   end    
 
 end
