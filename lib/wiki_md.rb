@@ -5,11 +5,10 @@
 require 'dxsectionx'
 
 
-
 class WikiMd
   include RXFHelperModule
   
-  attr_reader :active_heading
+  attr_reader :active_heading, :filename
   
   def initialize(wiki=nil, debug: false)
     
@@ -64,14 +63,14 @@ class WikiMd
     @dxsx.dx.all.map {|section| section.x.lines.first.chomp[/(?<=# ).*/] }
   end
   
-  def new_md(x=nil)
+  def new_md(x=nil, title: 'MyWiki')
     
     s = nil
     s, _ = RXFHelper.read(x) if x
     
 s ||= <<EOF    
 <?dynarex schema="sections[title]/section(x)" format_mask="[!x]"?>
-title: MyWiki
+title: #{title}
 
 --#
 
@@ -85,12 +84,25 @@ EOF
   alias import new_md 
   
   def read_section(heading)
+    
     section = find heading
-    section.x if section
+    
+    if section then
+      
+      r = section.x 
+      
+      def r.to_html()
+         Kramdown::Document\
+          .new(Martile.new(self, ignore_domainlabel: @domain).to_s).to_html
+      end
+      
+      r
+    end
   end
   
   def save(filename=@filename)
-    FileX.write filename, @dxsx.to_s
+    FileX.write @filename=filename, @dxsx.to_s
+    @dxsx.dx.save filename.sub(/\.md$/, '.xml')
   end
   
   def title()
@@ -102,8 +114,14 @@ EOF
   end
     
   def to_sections()
+    
+    @dxsx.dx.sort_by! do |rec|
+      rec.element('x').value.lines.first.chomp[/(?<=^# ).*/]
+    end
+    
     @dxsx.to_doc.root.xpath('records/section')\
         .map {|x| x.xml(pretty: true)}.join("\n")
+    
   end
   
   def to_xml()
