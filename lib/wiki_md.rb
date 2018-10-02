@@ -10,9 +10,9 @@ class WikiMd
   
   attr_reader :active_heading, :filename
   
-  def initialize(wiki=nil, debug: false)
-    
-    @debug = debug
+  def initialize(wiki=nil, domain: nil, debug: false)
+     
+    @domain, @debug = domain, debug
     
     if wiki then
       s, type = RXFHelper.read(wiki, auto: false)
@@ -90,6 +90,9 @@ EOF
     if section then
       
       r = section.x 
+      
+      puts '@domain: ' + @domain.inspect if @debug
+      r.instance_variable_set(:@domain, @domain)
       
       def r.to_html()
          Kramdown::Document\
