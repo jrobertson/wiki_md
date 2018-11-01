@@ -10,15 +10,24 @@ class WikiMd
   
   attr_reader :active_heading, :filename
   
-  def initialize(wiki=nil, domain: nil, debug: false)
+  def initialize(wiki=nil, domain: nil, debug: false, base_url: '/')
      
-    @domain, @debug = domain, debug
+    @domain, @debug, @base_url = domain, debug, base_url
     
     if wiki then
+      
       s, type = RXFHelper.read(wiki, auto: false)
       @filename = wiki if type == :file or type == :dfs
       puts 's: ' + s.inspect if @debug
-      @dxsx = DxSectionX.new s, debug: debug
+      @dxsx = DxSectionX.new s, debug: debug, autosave: true
+      
+      @filepath = File.dirname @filename
+
+      indexfile = File.join(@filepath, 'index.xml')
+      
+      # check for the index.xml file      
+      @dx = load_index(indexfile)
+      
     else
       
       new_md()
@@ -29,8 +38,14 @@ class WikiMd
   
   
   def create_section(s)
-    @active_heading = s[/(?<=^# ).*/]
-    @dxsx.create(x: s)
+    
+    @active_heading = title = s[/(?<=^# ).*/]
+    tag = title.split(/ +/).map(&:capitalize).join
+
+    @dxsx.create(x: s + "\n\n+ " + tag)
+    @dx.create title: title, url: [@base_url, File.basename(@filename), 
+                                   URI.escape(title)].join('/')
+    FileX.write @filename, @dxsx.to_s if @filename
   end
   
   alias add_section create_section
@@ -76,7 +91,7 @@ title: #{title}
 
 EOF
     
-    @dxsx = DxSectionX.new s    
+    @dxsx = DxSectionX.new s, autosave: true, debug: @debug 
 
     
   end
@@ -104,8 +119,15 @@ EOF
   end
   
   def save(filename=@filename)
+    
+    @filename = filename
+    @filepath = File.dirname(@filename)
     FileX.write @filename=filename, @dxsx.to_s
-    @dxsx.dx.save filename.sub(/\.md$/, '.xml')
+    
+    puts 'before @dxsx save' if @debug
+    @dxsx.save filename.sub(/\.md$/, '.xml')
+    @dx = new_index(File.join(@filepath, 'index.xml')) unless @dx
+    
   end
   
   def title()
@@ -156,5 +178,30 @@ EOF
     @active_heading = content[/(?<=^# ).*/]
     r.x = content
   end    
+  
+  private
+  
+  def load_index(indexfile)
+    
+    if FileX.exists? indexfile then
 
+      puts 'file found: ' + indexfile.inspect if @debug
+      Dynarex.new indexfile, autosave: true
+
+    else
+
+      # if it doesn't exist create it
+      new_index(indexfile)
+
+    end    
+  end
+  
+  def new_index(indexfile)
+    
+    dx = Dynarex.new 'entries[doc]/entry(title, url)', autosave: true, 
+        debug: @debug
+    dx.save indexfile    
+    dx
+    
+  end
 end
