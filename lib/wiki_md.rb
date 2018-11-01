@@ -10,9 +10,11 @@ class WikiMd
   
   attr_reader :active_heading, :filename
   
-  def initialize(wiki=nil, domain: nil, debug: false, base_url: '/')
+  def initialize(wiki=nil, domain: nil, debug: false, base_url: '/', 
+                 tag_base_url: '/tag')
      
-    @domain, @debug, @base_url = domain, debug, base_url
+    @domain, @debug, @base_url, @tag_base_url = domain, debug, base_url, 
+        tag_base_url
     
     if wiki then
       
@@ -43,8 +45,9 @@ class WikiMd
     tag = title.split(/ +/).map(&:capitalize).join
 
     @dxsx.create(x: s + "\n\n+ " + tag)
-    @dx.create title: title, url: [@base_url, File.basename(@filename), 
-                                   URI.escape(title)].join('/')
+    @dx.create title: title + ' #' + tag, 
+        url: [@base_url, File.basename(@filename),  
+              URI.escape(title)].join('/')
     FileX.write @filename, @dxsx.to_s if @filename
   end
   
@@ -108,10 +111,32 @@ EOF
       
       puts '@domain: ' + @domain.inspect if @debug
       r.instance_variable_set(:@domain, @domain)
+      r.instance_variable_set(:@tag_url, "%s/%s" % [@tag_base_url, 
+                                File.basename(@filename)[/.*(?=\.\w+$)/]])
       
       def r.to_html()
-         Kramdown::Document\
-          .new(Martile.new(self, ignore_domainlabel: @domain).to_s).to_html
+        
+        lines = self.lines
+        last_line = lines.last
+        
+        content, tags = if last_line[0] == '+' then
+        
+          raw_tags = last_line[/(?<=\+).*/].chomp.split
+          [lines[0..-2].join, raw_tags\
+            .map {|x| "+ [%s](%s/%s)" % [x, @tag_url, x]}]
+          
+        else
+          
+          [self, []]
+          
+        end
+        
+        pre_html = Martile.new(content, ignore_domainlabel: @domain).to_s
+        tags_html = Kramdown::Document.new(tags.join("\n")).to_html\
+            .sub('<ul>','<ul id="tags">')
+        Kramdown::Document.new(pre_html + "\n\n" + tags_html).to_html
+        
+
       end
       
       r

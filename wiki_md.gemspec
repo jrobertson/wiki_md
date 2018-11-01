@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = 'wiki_md'
-  s.version = '0.2.0'
-  s.summary = 'Designed for mainintaing many wiki entries within a single ' + 
+  s.version = '0.2.1'
+  s.summary = 'Designed for maintaining many wiki entries within a single ' + 
       'document in Markdown format. #nothrills #personalwiki'
   s.authors = ['James Robertson']
   s.files = Dir['lib/wiki_md.rb']
