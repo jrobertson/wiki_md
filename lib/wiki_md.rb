@@ -8,9 +8,9 @@ require 'dxsectionx'
 class WikiMd
   include RXFHelperModule
   
-  attr_reader :active_heading, :filename
+  attr_reader :active_heading, :filename, :dx
   
-  def initialize(wiki=nil, domain: nil, debug: false, base_url: '/', 
+  def initialize(wiki=nil, domain: nil, debug: false, base_url: '', 
                  tag_base_url: '/tag')
      
     @domain, @debug, @base_url, @tag_base_url = domain, debug, base_url, 
@@ -35,20 +35,48 @@ class WikiMd
       new_md()
       
     end
+    
+    save()
             
   end
-  
+
+  def create_section(s)
+
+    @active_heading = title = s[/(?<=^# ).*/]
+    url = [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
+              URI.escape(title)].join('/')
+    
+    if s.rstrip.lines.last =~ /^\+\s+/ then
+      
+      @dxsx.create(x: s, url: url)
+      
+    else      
+
+      a = title.split(/ +/)
+      tag = a.length > 1 ? a.map(&:capitalize).join : a.first
+
+      @dxsx.create(x: s + "\n\n+ " + tag, url: url)
+      
+    end
+    
+    FileX.write @filename, @dxsx.to_s if @filename
+    
+  end  
   
   def create_section(s)
-    
-    @active_heading = title = s[/(?<=^# ).*/]
-    tag = title.split(/ +/).map(&:capitalize).join
 
-    @dxsx.create(x: s + "\n\n+ " + tag)
-    @dx.create title: title + ' #' + tag, 
-        url: [@base_url, File.basename(@filename),  
+    @active_heading = title = s[/(?<=^# ).*/]
+
+    s2 = s.rstrip.lines.last =~ /^\+\s+/ ? s :  s + "\n\n+ " + tag
+    
+    @dxsx.create(x: s2)
+    
+    tag = s.rstrip.lines.last[/(?<=^\+\s).*/]
+    @dx.create title: title + ' #' + tag.lstrip, 
+        url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
               URI.escape(title)].join('/')
     FileX.write @filename, @dxsx.to_s if @filename
+    
   end
   
   alias add_section create_section
@@ -143,7 +171,7 @@ EOF
     end
   end
   
-  def save(filename=@filename)
+  def save(filename=@filename || 'mywiki.md')
     
     @filename = filename
     @filepath = File.dirname(@filename)
@@ -202,6 +230,42 @@ EOF
     content = val =~ /# / ? val : r.x.lines.first + "\n" + val
     @active_heading = content[/(?<=^# ).*/]
     r.x = content
+    
+    rx = @dx.all.find {|x| x.title =~ /#{q}/}
+    tagline1 = content.lines.last[/^\+\s+(.*)/,1]    
+
+    if rx then
+      
+      # update the index entry if the title or tags have been modified
+      
+      title, tagline2 = rx.title.split(/\s+#/)      
+
+      
+      if title != @active_heading or tagline2 != tagline1 then
+        
+        rx.update title: @active_heading + ' #' + tagline1.split.join(' #'), 
+            url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],
+                URI.escape(title)].join('/')
+        
+      end
+      
+      
+    else
+      
+      # create a new index entry
+      
+      newtagline  = if tagline1 then
+        tagline1.split.join(' #')
+      else
+        a = @active_heading.split(/ +/)
+        a.length > 1 ? a.map(&:capitalize).join : a.first        
+      end
+
+      @dx.create title: @active_heading + ' #' + newtagline, 
+          url: [@base_url, File.basename(@filename),  
+                URI.escape(@active_heading)].join('/')      
+    end
+    
   end    
   
   private
