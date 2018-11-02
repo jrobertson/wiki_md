@@ -37,45 +37,30 @@ class WikiMd
     end
     
     save()
+    
+    @filepath ||= '.'
+    
+    @dxtags = DynarexTags.new(@filepath)
             
   end
 
-  def create_section(s)
-
-    @active_heading = title = s[/(?<=^# ).*/]
-    url = [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
-              URI.escape(title)].join('/')
-    
-    if s.rstrip.lines.last =~ /^\+\s+/ then
-      
-      @dxsx.create(x: s, url: url)
-      
-    else      
-
-      a = title.split(/ +/)
-      tag = a.length > 1 ? a.map(&:capitalize).join : a.first
-
-      @dxsx.create(x: s + "\n\n+ " + tag, url: url)
-      
-    end
-    
-    FileX.write @filename, @dxsx.to_s if @filename
-    
-  end  
   
   def create_section(s)
 
     @active_heading = title = s[/(?<=^# ).*/]
 
+    a = title.split(/ +/)
+    tag = a.length > 1 ? a.map(&:capitalize).join : a.first    
+    
     s2 = s.rstrip.lines.last =~ /^\+\s+/ ? s :  s + "\n\n+ " + tag
     
     @dxsx.create(x: s2)
     
-    tag = s.rstrip.lines.last[/(?<=^\+\s).*/]
     @dx.create title: title + ' #' + tag.lstrip, 
         url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
               URI.escape(title)].join('/')
     FileX.write @filename, @dxsx.to_s if @filename
+    @dxtags.generate
     
   end
   
@@ -246,6 +231,7 @@ EOF
         rx.update title: @active_heading + ' #' + tagline1.split.join(' #'), 
             url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],
                 URI.escape(title)].join('/')
+        @dxtags.generate
         
       end
       
