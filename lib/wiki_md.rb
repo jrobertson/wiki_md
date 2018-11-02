@@ -49,14 +49,19 @@ class WikiMd
 
     @active_heading = title = s[/(?<=^# ).*/]
 
-    a = title.split(/ +/)
-    tag = a.length > 1 ? a.map(&:capitalize).join : a.first    
+    tagline = s.rstrip.lines.last[/(?<=^\+\s).*/]
     
-    s2 = s.rstrip.lines.last =~ /^\+\s+/ ? s :  s + "\n\n+ " + tag
+    s2 = if tagline then
+      s
+    else
+      a = title.split      
+      tagline = a.length > 1 ? a.map(&:capitalize).join : a.first    
+      s + "\n\n+ " + tagline
+    end
     
     @dxsx.create(x: s2)
     
-    @dx.create title: title + ' #' + tag.lstrip, 
+    @dx.create title: title + ' #' + tagline.lstrip.split.join(' #'), 
         url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
               URI.escape(title)].join('/')
     FileX.write @filename, @dxsx.to_s if @filename
@@ -88,6 +93,10 @@ class WikiMd
     heading2 = r.x.lines.last[/(?<=redirect ).*/]
     heading2 ? find(heading2) : r
     
+  end
+
+  def find_tag(tag)
+    @dxtags.find tag
   end  
   
   def headings()
