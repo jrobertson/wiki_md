@@ -3,10 +3,12 @@
 # file: wiki_md.rb
 
 require 'dxsectionx'
+require 'dynarex-tags'
 
 
 class WikiMd
   include RXFHelperModule
+  using ColouredText
   
   attr_reader :active_heading, :filename, :dx
   
@@ -20,7 +22,7 @@ class WikiMd
       
       s, type = RXFHelper.read(wiki, auto: false)
       @filename = wiki if type == :file or type == :dfs
-      puts 's: ' + s.inspect if @debug
+      puts ('s: ' + s.inspect).debug if @debug
       @dxsx = DxSectionX.new s, debug: debug, autosave: true
       
       @filepath = File.dirname @filename
@@ -40,7 +42,7 @@ class WikiMd
     
     @filepath ||= '.'
     
-    @dxtags = DynarexTags.new(@filepath)
+    @dxtags = DynarexTags.new(@filepath, debug: debug)
             
   end
 
@@ -83,11 +85,11 @@ class WikiMd
   
   def find(q)
     
-    puts 'WikiMd::find q: ' + q.inspect if @debug
+    puts ('WikiMd::find q: ' + q.inspect).debug if @debug
     return @dxsx.dx.find q if q =~ /^\d+$/
     regex = q.is_a?(String) ? /#{q}/i : q
     r = @dxsx.dx.all.find {|section| section.x.lines.first =~ regex }
-    puts '  r: ' + r.inspect if @debug
+    puts ('  r: ' + r.inspect).debug if @debug
     return unless r
     
     heading2 = r.x.lines.last[/(?<=redirect ).*/]
@@ -131,7 +133,7 @@ EOF
       
       r = section.x 
       
-      puts '@domain: ' + @domain.inspect if @debug
+      puts ('@domain: ' + @domain.inspect).debug if @debug
       r.instance_variable_set(:@domain, @domain)
       r.instance_variable_set(:@tag_url, "%s/%s" % [@tag_base_url, 
                                 File.basename(@filename)[/.*(?=\.\w+$)/]])
@@ -171,7 +173,7 @@ EOF
     @filepath = File.dirname(@filename)
     FileX.write @filename=filename, @dxsx.to_s
     
-    puts 'before @dxsx save' if @debug
+    puts ('before @dxsx save').debug if @debug
     @dxsx.save filename.sub(/\.md$/, '.xml')
     @dx = new_index(File.join(@filepath, 'index.xml')) unless @dx
     
@@ -210,7 +212,7 @@ EOF
   
   def update_section(*args)
     
-    puts 'inside update_section' if @debug
+    puts 'inside update_section'.debug if @debug
     
     val, raw_q = args.reverse
     puts '  val: ' + val.inspect if @debug
@@ -222,11 +224,23 @@ EOF
     return false unless r
     
     content = val =~ /# / ? val : r.x.lines.first + "\n" + val
-    @active_heading = content[/(?<=^# ).*/]
-    r.x = content
+    @active_heading = title = content[/(?<=^# ).*/]
+
     
     rx = @dx.all.find {|x| x.title =~ /#{q}/}
     tagline1 = content.lines.last[/^\+\s+(.*)/,1]    
+    
+    puts 'tagline1: ' + tagline1.inspect if @debug
+    
+    s2 = if tagline1 then
+      content
+    else
+      a = title.split      
+      tagline1 = a.length > 1 ? a.map(&:capitalize).join : a.first    
+      content + "\n\n+ " + tagline1
+    end    
+    
+    r.x = s2
 
     if rx then
       
@@ -257,8 +271,10 @@ EOF
       end
 
       @dx.create title: @active_heading + ' #' + newtagline, 
-          url: [@base_url, File.basename(@filename),  
+          url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
                 URI.escape(@active_heading)].join('/')      
+      @dxtags.generate
+      
     end
     
   end    
@@ -269,8 +285,8 @@ EOF
     
     if FileX.exists? indexfile then
 
-      puts 'file found: ' + indexfile.inspect if @debug
-      Dynarex.new indexfile, autosave: true
+      puts ('file found: ' + indexfile.inspect).debug if @debug
+      Dynarex.new indexfile, autosave: true, debug: @debug
 
     else
 
