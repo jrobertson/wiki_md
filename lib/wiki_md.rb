@@ -119,18 +119,20 @@ class WikiMd
 
   end
   
+
   def find(q)
     
     puts ('WikiMd::find q: ' + q.inspect).debug if @debug
     return @dxsx.dx.find q if q =~ /^\d+$/
-
+    regex = q.is_a?(String) ? /#{q}/i : q
+    r = @dxsx.dx.all.find {|section| section.x.lines.first =~ regex }
     puts ('  r: ' + r.inspect).debug if @debug
     return unless r
     
     heading2 = r.x.lines.last[/(?<=redirect ).*/]
     heading2 ? find(heading2) : r
     
-  end
+  end  
 
   def find_tag(tag)
     @dxtags.find tag
