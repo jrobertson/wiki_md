@@ -21,16 +21,38 @@ class WikiMd
     if wiki then
       
       s, type = RXFHelper.read(wiki, auto: false)
-      @filename = wiki if type == :file or type == :dfs
-      puts ('s: ' + s.inspect).debug if @debug
-      @dxsx = DxSectionX.new s, debug: debug, autosave: true
       
-      @filepath = File.dirname @filename
+      if debug then
+        puts [
+          's: ' + s.inspect,
+          'type: ' + type.inspect,
+          's.lines.length: ' + s.lines.length.inspect]\
+          .join("\n").debug
+        puts ('file exists? ' + FileX.exists?(File.dirname(s)).inspect).debug
 
-      indexfile = File.join(@filepath, 'index.xml')
+      end
       
-      # check for the index.xml file      
-      @dx = load_index(indexfile)
+      if type == :unknown and s.lines.length == 1 and 
+          FileX.exists?(File.dirname(s)) then
+        puts 'before new_md()'.debug if debug
+        new_md()
+        @filename = wiki
+        
+      elsif type == :file or type == :dfs 
+        
+        @filename = wiki
+        
+        puts ('s: ' + s.inspect).debug if @debug
+        @dxsx = DxSectionX.new s, debug: debug, autosave: true
+        
+        @filepath = File.dirname @filename
+
+        indexfile = File.join(@filepath, 'index.xml')
+        
+        # check for the index.xml file      
+        @dx = load_index(indexfile)        
+        
+      end      
       
     else
       
@@ -63,23 +85,37 @@ class WikiMd
     
     @dxsx.create(x: s2)
     
-    @dx.create title: title + ' #' + tagline.lstrip.split.join(' #'), 
+    record = {title: title + ' #' + tagline.lstrip.split.join(' #'), 
         url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
-              URI.escape(title)].join('/')
+              URI.escape(title)].join('/')}
+    
+    @dx.create record
     FileX.write @filename, @dxsx.to_s if @filename
-    @dxtags.generate
+    @dxtags.add record
     
   end
   
   alias add_section create_section
   
   def delete_section(q)
+        
+    regex = q.is_a?(String) ? /#{q}/i : q
+    r = @dxsx.dx.all.find {|section| section.x.lines.first =~ regex }
     
-    r = find()
+    return unless r
     
-    return false unless r
+    r.delete
     
-    r.delete 
+    rx = @dx.all.find {|x| x.title =~ regex}
+
+    return unless rx    
+    
+    title = rx.title    
+    rx.delete 
+    @dxtags.delete title
+    puts ('deleted title: ' + title.inspect).debug if @debug
+    
+    :section_deleted
 
   end
   
@@ -87,8 +123,7 @@ class WikiMd
     
     puts ('WikiMd::find q: ' + q.inspect).debug if @debug
     return @dxsx.dx.find q if q =~ /^\d+$/
-    regex = q.is_a?(String) ? /#{q}/i : q
-    r = @dxsx.dx.all.find {|section| section.x.lines.first =~ regex }
+
     puts ('  r: ' + r.inspect).debug if @debug
     return unless r
     
@@ -106,6 +141,8 @@ class WikiMd
   end
   
   def new_md(x=nil, title: 'MyWiki')
+    
+    puts 'inside new_md'.debug if @debug
     
     s = nil
     s, _ = RXFHelper.read(x) if x
@@ -251,10 +288,11 @@ EOF
       
       if title != @active_heading or tagline2 != tagline1 then
         
-        rx.update title: @active_heading + ' #' + tagline1.split.join(' #'), 
+        record = {title: @active_heading + ' #' + tagline1.split.join(' #'), 
             url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],
-                URI.escape(title)].join('/')
-        @dxtags.generate
+                URI.escape(title)].join('/')}
+        rx.update record
+        @dxtags.add record
         
       end
       
@@ -270,11 +308,12 @@ EOF
         a.length > 1 ? a.map(&:capitalize).join : a.first        
       end
 
-      @dx.create title: @active_heading + ' #' + newtagline, 
+      record = {title: @active_heading + ' #' + newtagline, 
           url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
-                URI.escape(@active_heading)].join('/')      
-      @dxtags.generate
-      
+                URI.escape(@active_heading)].join('/')}
+      @dx.create record
+      @dxtags.add record
+            
     end
     
   end    
