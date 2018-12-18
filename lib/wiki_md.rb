@@ -194,10 +194,10 @@ EOF
           
         end
         
-        pre_html = Martile.new(content, ignore_domainlabel: @domain).to_s
+        html = Martile.new(content, ignore_domainlabel: @domain).to_html
         tags_html = Kramdown::Document.new(tags.join("\n")).to_html\
             .sub('<ul>','<ul id="tags">')
-        Kramdown::Document.new(pre_html + "\n\n" + tags_html).to_html
+        html + "\n\n" + tags_html
         
 
       end
