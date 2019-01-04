@@ -58,7 +58,7 @@ class WikiMd
         
       else
         
-        new_md(save: false)
+        @dxsx = DxSectionX.new s, autosave: false, debug: @debug, order: @order
         
       end      
       
