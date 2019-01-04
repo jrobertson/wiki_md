@@ -13,14 +13,16 @@ class WikiMd
   attr_reader :active_heading, :filename, :dx
   
   def initialize(wiki=nil, domain: nil, debug: false, base_url: '', 
-                 tag_base_url: '/tag')
+                 tag_base_url: '/tag', order: 'ascending', title: 'MyWiki')
      
-    @domain, @debug, @base_url, @tag_base_url = domain, debug, base_url, 
-        tag_base_url
+    @domain, @debug, @base_url = domain, debug, base_url
+    @tag_base_url, @order, @title = tag_base_url, order, title
     
     if wiki then
       
       s, type = RXFHelper.read(wiki, auto: false)
+      
+      puts ('type: ' + type.inspect).debug if debug
       
       if debug then
         puts [
@@ -30,10 +32,10 @@ class WikiMd
           .join("\n").debug
         puts ('file exists? ' + FileX.exists?(File.dirname(s)).inspect).debug
 
-      end
+      end      
       
-      if type == :unknown and s.lines.length == 1 and 
-          FileX.exists?(File.dirname(s)) then
+      if type == :unknown and (s.lines.length == 1 and 
+          FileX.exists?(File.dirname(s))) then
         puts 'before new_md()'.debug if debug
         new_md()
         @filename = wiki
@@ -43,7 +45,8 @@ class WikiMd
         @filename = wiki
         
         puts ('s: ' + s.inspect).debug if @debug
-        @dxsx = DxSectionX.new s, debug: debug, autosave: true
+        @dxsx = DxSectionX.new s, debug: debug, autosave: true, 
+            order: @order
         
         @filepath = File.dirname @filename
 
@@ -51,6 +54,11 @@ class WikiMd
         
         # check for the index.xml file      
         @dx = load_index(indexfile)        
+        save()
+        
+      else
+        
+        new_md(save: false)
         
       end      
       
@@ -60,7 +68,6 @@ class WikiMd
       
     end
     
-    save()
     
     @filepath ||= '.'
     
@@ -84,13 +91,19 @@ class WikiMd
     end
     
     @dxsx.create(x: s2)
+
+    puts ('@filename: ' + @filename.inspect).debug if @debug
+    
+    return unless @filename
     
     record = {title: title + ' #' + tagline.lstrip.split.join(' #'), 
         url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
               URI.escape(title)].join('/')}
     
     @dx.create record
-    FileX.write @filename, @dxsx.to_s if @filename
+    
+
+    FileX.write @filename, @dxsx.to_s
     @dxtags.add record
     
   end
@@ -142,7 +155,7 @@ class WikiMd
     @dxsx.dx.all.map {|section| section.x.lines.first.chomp[/(?<=# ).*/] }
   end
   
-  def new_md(x=nil, title: 'MyWiki')
+  def new_md(x=nil, title: @title, save: true)
     
     puts 'inside new_md'.debug if @debug
     
@@ -157,8 +170,7 @@ title: #{title}
 
 EOF
     
-    @dxsx = DxSectionX.new s, autosave: true, debug: @debug 
-
+    @dxsx = DxSectionX.new s, autosave: save, debug: @debug, order: @order
     
   end
   
@@ -318,7 +330,13 @@ EOF
             
     end
     
-  end    
+  end
+  
+  protected
+  
+  def dxsx()
+    @dxsx.dx
+  end
   
   private
   
@@ -327,7 +345,7 @@ EOF
     if FileX.exists? indexfile then
 
       puts ('file found: ' + indexfile.inspect).debug if @debug
-      Dynarex.new indexfile, autosave: true, debug: @debug
+      Dynarex.new indexfile, autosave: true, debug: @debug, order: @order
 
     else
 
@@ -340,7 +358,7 @@ EOF
   def new_index(indexfile)
     
     dx = Dynarex.new 'entries[doc]/entry(title, url)', autosave: true, 
-        debug: @debug
+        debug: @debug, order: @order
     dx.save indexfile    
     dx
     
