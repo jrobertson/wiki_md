@@ -12,6 +12,47 @@ class WikiMd
   
   attr_reader :active_heading, :filename, :dx
   
+  class Entry
+    
+    attr_reader :heading, :body, :footer, :tags, :x
+    
+    def initialize(rx)
+      
+      @rx = rx
+      @x = @rx.x
+      parse_x()
+      
+    end
+    
+    def body=(s)
+      text_entry = "%s\n\n%s\n\n%s" % [self.heading, s, self.footer]
+      self.x = text_entry
+    end
+    
+    def footer=(s)
+      a = @x.lines
+      a[-1] = s
+      self.x = a.join
+    end    
+    
+    def x=(s)
+      @rx.x = s
+      parse_x()
+    end
+    
+    private
+    
+    def parse_x()
+      
+      a = @rx.x.lines
+      @heading, @footer, @body = a.shift.chomp[/(?<=# ).*/], a.pop, 
+          a.join.strip
+      @tags = @footer[1..-1].strip.split
+      
+    end
+    
+  end
+  
   def initialize(wiki=nil, domain: nil, debug: false, base_url: '', 
                  tag_base_url: '/tag', order: 'ascending', title: 'MyWiki')
      
@@ -136,16 +177,17 @@ class WikiMd
   def find(q)
     
     puts ('WikiMd::find q: ' + q.inspect).debug if @debug
-    return @dxsx.dx.find q if q =~ /^\d+$/
+    return Entry.new(@dxsx.dx.find q) if q =~ /^\d+$/
     regex = q.is_a?(String) ? /#{q}/i : q
     r = @dxsx.dx.all.find {|section| section.x.lines.first =~ regex }
     puts ('  r: ' + r.inspect).debug if @debug
     return unless r
     
     heading2 = r.x.lines.last[/(?<=redirect ).*/]
-    heading2 ? find(heading2) : r
+    heading2 ? find(heading2) : Entry.new(r)
     
-  end  
+  end
+
 
   def find_tag(tag)
     @dxtags.find tag
@@ -228,7 +270,7 @@ EOF
     @dxsx.save filename.sub(/\.md$/, '.xml')
     @dx = new_index(File.join(@filepath, 'index.xml')) unless @dx
     
-  end
+  end  
   
   def title()
     @dxsx.dx.title()
@@ -297,18 +339,7 @@ EOF
       
       # update the index entry if the title or tags have been modified
       
-      title, tagline2 = rx.title.split(/\s+#/)      
-
-      
-      if title != @active_heading or tagline2 != tagline1 then
-        
-        record = {title: @active_heading + ' #' + tagline1.split.join(' #'), 
-            url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],
-                URI.escape(title)].join('/')}
-        rx.update record
-        @dxtags.add record
-        
-      end
+      update_index(rx, tagline1, @active_heading)
       
       
     else
@@ -336,6 +367,28 @@ EOF
   
   def dxsx()
     @dxsx.dx
+  end
+  
+  def save_files()
+    @filepath = File.dirname(@filename)
+    FileX.write @filename=filename, @dxsx.to_s    
+    @dx.save
+  end
+
+  def update_index(rx, tagline1, active_heading=nil)
+    
+    title, tagline2 = rx.title.split(/\s+#/)      
+    active_heading ||= title
+    
+    if title != active_heading or tagline2 != tagline1 then      
+      
+      record = {title: active_heading + ' #' + tagline1.split.join(' #'), 
+          url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],
+              URI.escape(title.gsub(/ /,'_'))].join('/')}
+      rx.update record
+      @dxtags.add record
+      
+    end    
   end
   
   private
