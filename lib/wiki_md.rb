@@ -25,7 +25,7 @@ class WikiMd
     end
     
     def body=(s)
-      text_entry = "%s\n\n%s\n\n%s" % [self.heading, s, self.footer]
+      text_entry = "# %s\n\n%s\n\n%s" % [self.heading, s, self.footer]
       self.x = text_entry
     end
     
@@ -75,11 +75,22 @@ class WikiMd
 
       end      
       
-      if type == :unknown and (s.lines.length == 1 and 
-          FileX.exists?(File.dirname(s))) then
+      if type == :unknown and s.lines.length == 1 then 
+          
+        #if FileX.exists?(File.dirname(s)) then
         puts 'before new_md()'.debug if debug
         new_md()
         @filename = wiki
+        
+        
+        @filepath = File.dirname @filename
+
+        indexfile = File.join(@filepath, 'index.xml')
+        
+        # check for the index.xml file      
+        @dx = load_index(indexfile)        
+        
+        save()
         
       elsif type == :file or type == :dfs 
         
@@ -139,7 +150,7 @@ class WikiMd
     
     record = {title: title + ' #' + tagline.lstrip.split.join(' #'), 
         url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
-              URI.escape(title)].join('/')}
+              URI.escape(title.gsub(/ /,'_'))].join('/')}
     
     @dx.create record
     
@@ -355,7 +366,7 @@ EOF
 
       record = {title: @active_heading + ' #' + newtagline, 
           url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
-                URI.escape(@active_heading)].join('/')}
+                URI.escape(@active_heading.gsub(/ /, '_'))].join('/')}
       @dx.create record
       @dxtags.add record
             
@@ -376,6 +387,8 @@ EOF
   end
 
   def update_index(rx, tagline1, active_heading=nil)
+    
+    puts ('rx: ' + rx.inspect).debug if @debug
     
     title, tagline2 = rx.title.split(/\s+#/)      
     active_heading ||= title
