@@ -411,7 +411,7 @@ EOF
     if FileX.exists? indexfile then
 
       puts ('file found: ' + indexfile.inspect).debug if @debug
-      Dynarex.new indexfile, autosave: true, debug: @debug, order: @order
+      Dynarex.new indexfile, autosave: true, debug: @debug
 
     else
 
@@ -424,7 +424,7 @@ EOF
   def new_index(indexfile)
     
     dx = Dynarex.new 'entries[doc]/entry(title, url)', autosave: true, 
-        debug: @debug, order: @order
+        debug: @debug, order: 'title ascending'
     dx.save indexfile    
     dx
     
