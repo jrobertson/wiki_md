@@ -129,7 +129,7 @@ class WikiMd
 
   
   def create_section(s)
-
+    
     @active_heading = title = s[/(?<=^# ).*/]
 
     tagline = s.rstrip.lines.last[/(?<=^\+\s).*/]
@@ -185,12 +185,23 @@ class WikiMd
   end
   
 
-  def find(q)
+  def find(q, exact_match: false)
     
     puts ('WikiMd::find q: ' + q.inspect).debug if @debug
     return Entry.new(@dxsx.dx.find q) if q =~ /^\d+$/
-    regex = q.is_a?(String) ? /#{q}/i : q
-    r = @dxsx.dx.all.find {|section| section.x.lines.first =~ regex }
+    
+    regex = if q.is_a?(String) then      
+      exact_match ? /#{q}$/i : /#{q}/i
+    else
+      q
+    end
+    
+    r = @dxsx.dx.all.find do |section|
+      
+      section.x.lines.first =~ regex
+      
+    end
+    
     puts ('  r: ' + r.inspect).debug if @debug
     return unless r
     
@@ -234,8 +245,37 @@ EOF
     section = find heading
     
     if section then
+
+      # find any newly created links which now have a destination page
       
-      r = section.x 
+      sectionx = section.x.lines.map do |x|
+
+        link = x[/\?([^\?]+)\?/,1]
+
+        if link then
+
+          a = link.split
+          r = a.last =~ /\// 
+
+          if not r then
+            
+            heading = a[0..2].join
+            
+            if find heading then
+              x.sub!(/\?[^\?]+\?/, "[%s](%s)" % [heading, a.last])
+            end
+          end
+
+        end
+
+        x
+      end.join
+      
+      puts ('sectionx: ' + sectionx.inspect).debug if @debug
+
+      section.x = sectionx unless section.x == sectionx
+
+      r = section 
       
       puts ('@domain: ' + @domain.inspect).debug if @debug
       r.instance_variable_set(:@domain, @domain)
@@ -244,7 +284,7 @@ EOF
       
       def r.to_html()
         
-        lines = self.lines
+        lines = self.x.lines
         last_line = lines.last
         
         content, tags = if last_line[0] == '+' then
@@ -255,11 +295,13 @@ EOF
           
         else
           
-          [self, []]
+          [self.x, []]
           
         end
         
-        html = Martile.new(content, ignore_domainlabel: @domain).to_html
+        s = block_given? ? yield(content) : content
+        
+        html = Martile.new(s, ignore_domainlabel: @domain).to_html
         tags_html = Kramdown::Document.new(tags.join("\n")).to_html\
             .sub('<ul>','<ul id="tags">')
         html + "\n\n" + tags_html
