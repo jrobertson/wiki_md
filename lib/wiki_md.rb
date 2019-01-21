@@ -240,9 +240,9 @@ EOF
   
   alias import new_md 
   
-  def read_section(heading)
+  def read_section(heading, exact_match: false)
     
-    section = find heading
+    section = find heading, exact_match: exact_match
     
     if section then
 
