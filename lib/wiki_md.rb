@@ -184,6 +184,9 @@ class WikiMd
 
   end
   
+  def entries()
+    @dxsx.dx.all.map {|x| Entry.new(x)}
+  end
 
   def find(q, exact_match: false)
     
