@@ -198,6 +198,7 @@ class WikiMd
     return Entry.new(@dxsx.dx.find q) if q =~ /^\d+$/
     
     regex = if q.is_a?(String) then      
+      q.gsub!(/_/,' ')
       exact_match ? /#{q}$/i : /#{q}/i
     else
       q
@@ -340,8 +341,8 @@ EOF
     @dxsx.dx.title = s
   end
   
-  def to_aztoc
-    Yatoc.new(self.entries.map(&:to_s).join).to_aztoc
+  def to_aztoc(base_url: '')
+    Yatoc.new(self.entries.map(&:to_s).join).to_aztoc.gsub(/(?<=href=')([^']+)/, base_url + '\1')
   end
     
   def to_sections()
