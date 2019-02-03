@@ -10,7 +10,7 @@ class WikiMd
   include RXFHelperModule
   using ColouredText
   
-  attr_reader :active_heading, :filename, :dx
+  attr_reader :active_heading, :filename, :dx, :dxsx
   
   class Entry
     
@@ -355,6 +355,11 @@ EOF
     @dxsx.to_s
   end
   
+  def to_toc()
+    y = Yatoc.new(Kramdown::Document.new(self.to_sections).to_html)
+    puts y.to_html    
+  end
+  
   def update(val)
     self.method(val[/^<\?dynarex/] ? :import : :update_section).call val
   end
@@ -421,9 +426,6 @@ EOF
   
   protected
   
-  def dxsx()
-    @dxsx.dx
-  end
   
   def save_files()
     @filepath = File.dirname(@filename)
