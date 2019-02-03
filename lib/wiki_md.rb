@@ -40,6 +40,10 @@ class WikiMd
       parse_x()
     end
     
+    def to_s()
+      @x.clone + "\n\n"
+    end
+    
     private
     
     def parse_x()
@@ -334,6 +338,10 @@ EOF
   
   def title=(s)
     @dxsx.dx.title = s
+  end
+  
+  def to_aztoc
+    Yatoc.new(self.entries.map(&:to_s).join).to_aztoc
   end
     
   def to_sections()
