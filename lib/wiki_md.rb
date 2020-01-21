@@ -6,6 +6,9 @@ require 'dxsectionx'
 require 'dynarex-tags'
 
 
+class WikiMdReadError < Exception
+end
+
 class WikiMd
   include RXFHelperModule
   using ColouredText
@@ -99,6 +102,9 @@ class WikiMd
       elsif type == :file or type == :dfs 
         
         @filename = wiki
+
+        valid, msg = validate s
+        raise WikiMdReadError, msg unless valid
         
         puts ('s: ' + s.inspect).debug if @debug
         @dxsx = DxSectionX.new s, debug: debug, autosave: true, 
@@ -331,7 +337,13 @@ EOF
     @dxsx.save filename.sub(/\.md$/, '.xml')
     @dx = new_index(File.join(@filepath, 'index.xml')) unless @dx
     
-  end  
+  end
+
+  def sort!()
+    @dxsx.dx.sort_by! do |rec|
+      rec.element('x').value.lines.first.chomp[/(?<=^# ).*/]
+    end       
+  end
   
   def title()
     @dxsx.dx.title()
@@ -344,12 +356,35 @@ EOF
   def to_aztoc(base_url: '')
     Yatoc.new(self.entries.map(&:to_s).join).to_aztoc.gsub(/(?<=href=')([^']+)/, base_url + '\1')
   end
+  
+  # generates an accordion menu in XML format. It can be rendered to 
+  # HTML using the Martile gem
+  #
+  def to_accordion()
+    
+    doc = Rexle.new('<accordion/>')
+
+    sort!()
+
+    entries.each do |x|
+
+      e = Rexle::Element.new('panel')
+      e.add_attribute(title: x.heading)
+      
+      body = "<body>%s</body>" % Martile.new(x.body).to_html
+      Rexle.new(body).root.elements.each {|element| e.add element }
+      
+      doc.root.add e      
+
+    end
+
+    doc.root.xml pretty: true
+    
+  end
     
   def to_sections()
     
-    @dxsx.dx.sort_by! do |rec|
-      rec.element('x').value.lines.first.chomp[/(?<=^# ).*/]
-    end
+    sort!()
     
     @dxsx.to_doc.root.xpath('records/section')\
         .map {|x| x.xml(pretty: true)}.join("\n")
@@ -484,5 +519,18 @@ EOF
     dx.save indexfile    
     dx
     
+  end
+  
+  def validate(s)
+    
+    a = s[/(?<=--#\n).*/m].split(/(?=\n# )/)
+    valid = a.all? {|x| x.lines.last[0] == '+'}
+    return true if valid
+    
+    r =  a.detect {|x| x.lines.last[0] != '+'}
+    
+    heading = r[/(?<=# ).*/]    
+
+    [false, 'Tagline missing from heading # ' + heading]
   end
 end
