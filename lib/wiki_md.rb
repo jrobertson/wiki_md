@@ -68,7 +68,9 @@ class WikiMd
     
     if wiki then
       
+      puts 'before rxfhelper wiki: ' + wiki.inspect if @debug
       s, type = RXFHelper.read(wiki, auto: false)
+      puts 'after rxfhelper s: ' + s.inspect if @debug
       
       puts ('type: ' + type.inspect).debug if debug
       
@@ -107,8 +109,8 @@ class WikiMd
         raise WikiMdReadError, msg unless valid
         
         puts ('s: ' + s.inspect).debug if @debug
-        @dxsx = DxSectionX.new s, debug: debug, autosave: true, 
-            order: @order
+        
+        @dxsx = read_raw_document s
         
         @filepath = File.dirname @filename
 
@@ -120,7 +122,7 @@ class WikiMd
         
       else
         
-        @dxsx = DxSectionX.new s, autosave: false, debug: @debug, order: @order
+        @dxsx = read_raw_document s
         
       end      
       
@@ -195,7 +197,14 @@ class WikiMd
   end
   
   def entries()
-    @dxsx.dx.all.map {|x| Entry.new(x)}
+    
+    @dxsx.dx.all.map do |x| 
+      
+      puts 'x: ' + x.inspect if @debug
+      Entry.new(x)
+      
+    end
+    
   end
 
   def find(q, exact_match: false)
@@ -252,7 +261,7 @@ EOF
     
   end
   
-  alias import new_md 
+  alias import new_md   
   
   def read_section(heading, exact_match: false)
     
@@ -331,7 +340,8 @@ EOF
     
     @filename = filename
     @filepath = File.dirname(@filename)
-    FileX.write @filename=filename, @dxsx.to_s
+    
+    FileX.write @filename=filename, dx_to_wmd(@dxsx.to_s)
     
     puts ('before @dxsx save').debug if @debug
     @dxsx.save filename.sub(/\.md$/, '.xml')
@@ -370,7 +380,7 @@ EOF
 
       e = Rexle::Element.new('panel')
       e.add_attribute(title: x.heading)
-      
+      puts 'x.body: ' + x.body.inspect if @debug
       body = "<body>%s</body>" % Martile.new(x.body).to_html
       Rexle.new(body).root.elements.each {|element| e.add element }
       
@@ -395,8 +405,12 @@ EOF
     @dxsx.to_doc.xml(declaration: false, pretty: true)    
   end
   
-  def to_s()
+  def to_rawdx()
     @dxsx.to_s
+  end
+  
+  def to_s()
+    dx_to_wmd(@dxsx.to_dx)
   end
   
   def to_toc()
@@ -521,7 +535,18 @@ EOF
     
   end
   
+  def read_raw_document(s)
+    
+    s2 = s.lines.first =~ /^<\?wikimd\b/ ? wmd_to_dx(s) : s
+
+    DxSectionX.new s2, debug: @debug, autosave: true, 
+        order: @order
+    
+  end
+  
   def validate(s)
+    
+    puts 'validate s:'  + s.inspect if @debug
     
     a = s[/(?<=--#\n).*/m].split(/(?=\n# )/)
     valid = a.all? {|x| x.lines.last[0] == '+'}
@@ -533,4 +558,86 @@ EOF
 
     [false, 'Tagline missing from heading # ' + heading]
   end
+  
+  def wmd_to_dx(s)
+    
+    puts 's: ' + s.inspect if @debug
+    
+    header, body = s.split(/.*(?=^#)/,2)
+    
+    puts 'body: ' + body.inspect if @debug
+    
+    title = header[/title: +(.*)/,1]
+        
+raw_dx_header = "
+<?dynarex schema='sections[title]/section(x)' format_mask='[!x]'?>
+title: #{title}
+
+--#\n\n"
+    
+    puts 'raw_dx_header: ' + raw_dx_header.inspect if @debug#
+    
+    rawdx = raw_dx_header + body
+    puts 'rawdx: ' + rawdx.inspect if @debug
+    
+    dx = Dynarex.new(rawdx)
+    
+    rows = dx.all.map do |record|
+      
+      a = record.x.lines
+      puts 'a: ' + a.inspect if @debug
+
+      raw_heading = a.shift.chomp
+      puts 'raw_heading: ' + raw_heading.inspect if @debug
+      heading = raw_heading[/^#[^#]+/].rstrip
+
+      tags = raw_heading =~ /#/ ? raw_heading[/(?<=# ).*/].scan(/#(\w+)/).flatten : ''
+      puts ('tags: ' + tags.inspect).debug if @debug
+
+      if a.last =~ /^\+/ then
+        
+        footer = a.pop
+        tags += footer[1..-1].strip.split  
+        
+      else
+
+        if tags.empty? then
+          tags = heading.downcase.gsub(/['\.\(\)]/,'').split
+        end
+        
+        footer = '+ ' + tags.join(' ')
+        
+      end
+
+      body =  a.join.strip
+
+      [heading, body, footer].join("\n\n")
+
+    end
+    
+    raw_dx_header + rows.join("\n\n")
+    
+  end
+  
+  def dx_to_wmd(dx)
+    
+    rows = dx.all.map do |record|
+      
+      a = record.x.lines
+
+      raw_heading = a.shift.chomp
+      footer = a.pop
+      body = a.join.strip
+
+      tags = footer[2..-1].split.map {|x| '#' + x }.join(' ')
+      heading = raw_heading + ' ' + tags
+      
+      [heading, body].join("\n\n")
+      
+    end
+    
+    "<?wikimd  version='1.0'?>
+title: " + dx.title + "\n\n" + rows.join("\n\n")
+    
+  end  
 end
