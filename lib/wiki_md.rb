@@ -19,9 +19,9 @@ class WikiMd
     
     attr_reader :heading, :body, :footer, :tags, :x
     
-    def initialize(rx)
+    def initialize(rx, debug: false)
       
-      @rx = rx
+      @rx, @debug = rx, debug
       @x = @rx.x
       parse_x()
       
@@ -52,6 +52,8 @@ class WikiMd
     def parse_x()
       
       a = @rx.x.lines
+      puts 'a: ' + a.inspect if @debug
+      
       @heading, @footer, @body = a.shift.chomp[/(?<=# ).*/], a.pop, 
           a.join.strip
       @tags = @footer[1..-1].strip.split
@@ -69,7 +71,9 @@ class WikiMd
     if wiki then
       
       puts 'before rxfhelper wiki: ' + wiki.inspect if @debug
-      s, type = RXFHelper.read(wiki, auto: false)
+      raw_s, type = RXFHelper.read(wiki, auto: false)
+      s = raw_s.strip
+      
       puts 'after rxfhelper s: ' + s.inspect if @debug
       
       puts ('type: ' + type.inspect).debug if debug
@@ -201,7 +205,7 @@ class WikiMd
     @dxsx.dx.all.map do |x| 
       
       puts 'x: ' + x.inspect if @debug
-      Entry.new(x)
+      Entry.new(x, debug: @debug)
       
     end
     
@@ -339,9 +343,12 @@ EOF
   def save(filename=@filename || 'mywiki.md')
     
     @filename = filename
-    @filepath = File.dirname(@filename)
+    puts '@filename: ' + @filename.inspect if @debug
     
-    FileX.write @filename=filename, dx_to_wmd(@dxsx.to_s)
+    @filepath = File.expand_path(File.dirname(@filename).to_s)
+    puts '@filepath: ' + @filepath.inspect if @debug
+    
+    FileX.write @filename=filename, dx_to_wmd(@dxsx.to_dx)
     
     puts ('before @dxsx save').debug if @debug
     @dxsx.save filename.sub(/\.md$/, '.xml')
@@ -370,11 +377,11 @@ EOF
   # generates an accordion menu in XML format. It can be rendered to 
   # HTML using the Martile gem
   #
-  def to_accordion()
+  def to_accordion(ascending: true)
     
     doc = Rexle.new('<accordion/>')
 
-    sort!()
+    sort!() if ascending
 
     entries.each do |x|
 
@@ -487,7 +494,7 @@ EOF
   
   def save_files()
     @filepath = File.dirname(@filename)
-    FileX.write @filename=filename, @dxsx.to_s    
+    FileX.write @filename=filename, dx_to_wmd(@dxsx.to_dx)
     @dx.save
   end
 
@@ -529,8 +536,21 @@ EOF
   def new_index(indexfile)
     
     dx = Dynarex.new 'entries[doc]/entry(title, url)', autosave: true, 
-        debug: @debug, order: 'title ascending'
-    dx.save indexfile    
+        debug: @debug, order: 'title ascending', filepath: indexfile
+
+    
+    entries.each do |entry|
+
+      record = {title: entry.heading + ' #' + entry.tags.join(' #'), 
+          url: [@base_url, File.basename(@filename)[/.*(?=\.\w+)/],  
+                URI.escape(entry.heading.gsub(/ /,'_'))].join('/')}
+                
+      dx.create record    
+
+    end
+    
+    puts ('indexfile: ' + indexfile.inspect).debug if @debug
+    dx.save indexfile
     dx
     
   end
