@@ -1,3 +1,43 @@
+# Generating an Accordion style menu from a WikiMd document
+
+    require 'wiki_md'
+
+
+    s = "<?wikimd version='1.0'?>
+    title: New Wikimd format
+
+    # Morning #bed #breakfast
+
+    Get out of bed
+
+    # Afternoon #lunch #ready
+
+    Have lunch
+
+    # Evening #relax #bed
+
+    Watch some TV
+
+    Make a list of what to do tomorrow, including:
+
+    * housework
+    * reading
+    * exercise
+
+    "
+    puts s
+    wmd = WikiMd.new(s, debug: true)
+    wmd.save
+    s2 = wmd.to_accordion ascending: false
+    html = Martile.new(s2).to_html
+    File.write '/tmp/menu.html', html
+
+The above example code generates an HTML file containing an accordion style menu.
+
+menu html accordion wikimd
+
+------------------------
+
 # Introducing the wiki_md gem
 
     require 'wiki_md'
