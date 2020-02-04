@@ -355,11 +355,17 @@ EOF
     @dx = new_index(File.join(@filepath, 'index.xml')) unless @dx
     
   end
-
+  
   def sort!()
+    
     @dxsx.dx.sort_by! do |rec|
       rec.element('x').value.lines.first.chomp[/(?<=^# ).*/]
-    end       
+    end
+    
+  end
+  
+  def tags()
+    @dxtags.tags
   end
   
   def title()
@@ -377,13 +383,39 @@ EOF
   # generates an accordion menu in XML format. It can be rendered to 
   # HTML using the Martile gem
   #
-  def to_accordion(ascending: true)
+  def to_accordion(ascending: true, includetags: false)
     
     doc = Rexle.new('<accordion/>')
+    
+    unsortedrows = entries
+    
+    if includetags then
+      
+      unsortedrows += tags().map do |key, value|
 
-    sort!() if ascending
+        body = value.map do |x|
 
-    entries.each do |x|
+          title = x[:title][/^[^#]+/].rstrip
+          "* [%s](#%s)" % [title, title.downcase.gsub(/\W/,'-')\
+                        .gsub(/-{2,}/,'-').gsub(/^-|-$/,'')]
+        end
+
+        OpenStruct.new(heading: key, body: body.join("\n"))
+        
+      end
+      
+      
+      
+    end
+    
+    puts 'ascending: ' + ascending.inspect if @debug
+    
+    rows = ascending ? unsortedrows.sort_by {|x| x.heading.downcase} \
+        : unsortedrows
+    
+    puts 'rows: ' + rows.inspect if @debug
+
+    rows.each do |x|
 
       e = Rexle::Element.new('panel')
       e.add_attribute(title: x.heading)
@@ -546,6 +578,7 @@ EOF
                 URI.escape(entry.heading.gsub(/ /,'_'))].join('/')}
                 
       dx.create record    
+      @dxtags.add record
 
     end
     
