@@ -88,6 +88,8 @@ class WikiMd
 
       end      
       
+     
+      
       if type == :unknown and s.lines.length == 1 then 
           
         #if FileX.exists?(File.dirname(s)) then
@@ -109,7 +111,14 @@ class WikiMd
         
         @filename = wiki
 
-        valid, msg = validate s
+        valid, msg = if s =~ /^<\?wikimd\b/ then
+          true
+        else
+          validate(s)
+        end
+        
+
+      
         raise WikiMdReadError, msg unless valid
         
         puts ('s: ' + s.inspect).debug if @debug
@@ -120,15 +129,23 @@ class WikiMd
 
         indexfile = File.join(@filepath, 'index.xml')
         
+        if s != FileX.read(wiki) then
+          
+          puts '*** file changed! ***'.info if @debug
+          FileX.rm indexfile
+          FileX.rm File.join(@filepath, 'dxtags.xml')
+          
+        end        
+        
         # check for the index.xml file      
-        @dx = load_index(indexfile)        
-        save()
+        @dx = load_index(indexfile) if FileX.exists? indexfile
         
       else
         
         @dxsx = read_raw_document s
         
       end      
+
       
     else
       
@@ -136,10 +153,10 @@ class WikiMd
       
     end
     
-    
+      
     @filepath ||= '.'
     
-    @dxtags = DynarexTags.new(@filepath, debug: debug)
+    @dxtags = DynarexTags.new(@filepath, debug: debug) 
             
   end
 
@@ -348,7 +365,13 @@ EOF
     @filepath = File.expand_path(File.dirname(@filename).to_s)
     puts '@filepath: ' + @filepath.inspect if @debug
     
-    FileX.write @filename=filename, dx_to_wmd(@dxsx.to_dx)
+    puts 'dx_to_wmd: ' + dx_to_wmd(@dxsx.to_dx) if @debug
+    
+    contents = dx_to_wmd(@dxsx.to_dx)
+    FileX.write @filename=filename, contents
+    
+    # make a backup file
+    FileX.write @filename.sub(/\.\w+$/,'.bak'), contents
     
     puts ('before @dxsx save').debug if @debug
     @dxsx.save filename.sub(/\.md$/, '.xml')
@@ -400,7 +423,7 @@ EOF
                         .gsub(/-{2,}/,'-').gsub(/^-|-$/,'')]
         end
 
-        OpenStruct.new(heading: key, body: body.join("\n"))
+        OpenStruct.new(heading: key + " (#{value.length})", body: body.join("\n"))
         
       end
       
@@ -570,6 +593,7 @@ EOF
     dx = Dynarex.new 'entries[doc]/entry(title, url)', autosave: true, 
         debug: @debug, order: 'title ascending', filepath: indexfile
 
+    @dxtags = DynarexTags.new(@filepath, debug: @debug) 
     
     entries.each do |entry|
 
