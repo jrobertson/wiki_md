@@ -132,8 +132,10 @@ class WikiMd
         if s != FileX.read(wiki) then
           
           puts '*** file changed! ***'.info if @debug
-          FileX.rm indexfile
-          FileX.rm File.join(@filepath, 'dxtags.xml')
+          FileX.rm indexfile if FileX.exists? indexfile
+          
+          dxtagsfile = File.join(@filepath, 'dxtags.xml')
+          FileX.rm dxtagsfile if FileX.exists? dxtagsfile
           
         end        
         
@@ -443,7 +445,7 @@ EOF
       e = Rexle::Element.new('panel')
       e.add_attribute(title: x.heading)
       puts 'x.body: ' + x.body.inspect if @debug
-      body = "<body>%s</body>" % Martile.new(x.body).to_html
+      body = "<body>%s</body>" % Martile.new(x.body, ignore_domainlabel: @domain).to_html
       Rexle.new(body).root.elements.each {|element| e.add element }
       
       doc.root.add e      
