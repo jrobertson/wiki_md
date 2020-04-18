@@ -43,8 +43,16 @@ class WikiMd
       parse_x()
     end
     
-    def to_s()
-      @x.clone + "\n\n"
+    def to_s(compact: false)
+      
+      if !compact then
+        
+        @x.clone + "\n\n"
+        
+      else
+        '# ' + @heading + ' #' + @tags.join(' #') + "\n\n" + @body
+      end
+
     end
     
     private
@@ -255,6 +263,30 @@ class WikiMd
     heading2 ? find(heading2) : Entry.new(r)
     
   end
+  
+  def find_all(q, exact_match: false)
+    
+    puts ('WikiMd::find_all q: ' + q.inspect).debug if @debug
+    return @dxsx.dx.select {|q| Entry.new(q)} if q =~ /^\d+$/
+    
+    regex = if q.is_a?(String) then      
+      q.gsub!(/_/,' ')
+      exact_match ? /#{q}$/i : /#{q}/i
+    else
+      q
+    end
+    
+    r = @dxsx.dx.all.select do |section|
+      
+      section.x.lines.first =~ regex
+      
+    end
+    
+    puts ('  r: ' + r.inspect).debug if @debug
+    return unless r    
+        
+    r.map {|x| Entry.new x }
+  end  
 
 
   def find_tag(tag)
@@ -408,9 +440,9 @@ EOF
   # generates an accordion menu in XML format. It can be rendered to 
   # HTML using the Martile gem
   #
-  def to_accordion(ascending: true, includetags: false)
+  def to_accordion(ascending: true, includetags: false, navbar: false)
     
-    doc = Rexle.new('<accordion/>')
+    doc = Rexle.new("<accordion navbar='#{navbar.to_s}'/>")
     
     unsortedrows = entries
     
