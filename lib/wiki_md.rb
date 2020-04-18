@@ -9,6 +9,7 @@ require 'dynarex-tags'
 class WikiMdReadError < Exception
 end
 
+
 class WikiMd
   include RXFHelperModule
   using ColouredText
@@ -265,10 +266,7 @@ class WikiMd
   end
   
   def find_all(q, exact_match: false)
-    
-    puts ('WikiMd::find_all q: ' + q.inspect).debug if @debug
-    return @dxsx.dx.select {|q| Entry.new(q)} if q =~ /^\d+$/
-    
+        
     regex = if q.is_a?(String) then      
       q.gsub!(/_/,' ')
       exact_match ? /#{q}$/i : /#{q}/i
@@ -278,6 +276,7 @@ class WikiMd
     
     r = @dxsx.dx.all.select do |section|
       
+      puts 'first: ' + section.x.lines.first.inspect if @debug
       section.x.lines.first =~ regex
       
     end
