@@ -79,6 +79,10 @@ class WikiMd
     
     if wiki then
       
+      if wiki.lines.length > 1 and wiki.lstrip[0] != '<' then
+        wiki = "<?wikimd  version='1.0'?>\ntitle: Untitled\n\n" + wiki
+      end
+      
       puts 'before rxfhelper wiki: ' + wiki.inspect if @debug
       raw_s, type = RXFHelper.read(wiki, auto: false)
       s = raw_s.strip
@@ -137,6 +141,7 @@ class WikiMd
         @filepath = File.dirname @filename
 
         indexfile = File.join(@filepath, 'index.xml')
+        puts 'indexfile: ' + indexfile.inspect if @debug
         
         if s != FileX.read(wiki) then
           
@@ -145,6 +150,7 @@ class WikiMd
           
           dxtagsfile = File.join(@filepath, 'dxtags.xml')
           FileX.rm dxtagsfile if FileX.exists? dxtagsfile
+          save()
           
         end        
         
@@ -733,8 +739,9 @@ title: #{title}
     
     rows = dx.all.map do |record|
       
-      a = record.x.lines
-
+      a = record.x.strip.lines
+      puts 'a: ' + a.inspect if @debug
+      
       raw_heading = a.shift.chomp
       footer = a.pop
       body = a.join.strip
