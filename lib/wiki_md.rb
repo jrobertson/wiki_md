@@ -536,11 +536,18 @@ EOF
     return false unless r
     
     content = val =~ /# / ? val : r.x.lines.first + "\n" + val
-    @active_heading = title = content[/(?<=^# ).*/]
-
+    @active_heading = title = content.lines.first[/(?<=^# )[^#]+/].rstrip
+    
+    if content.lines.last[/^\+/] then
+      tagline1 = content.lines.last[/^\+\s+(.*)/,1]    
+    else
+      tagline1 = content.lines.first[/(?<=# )[^#]+(.*)/]\
+          .scan(/(?<=#)\w+/).join(' ')
+      content = title + "\n" + content.lines[1..-1].join + "\n\n+ " +  tagline1
+    end
     
     rx = @dx.all.find {|x| x.title =~ /#{q}/}
-    tagline1 = content.lines.last[/^\+\s+(.*)/,1]    
+
     
     puts 'tagline1: ' + tagline1.inspect if @debug
     
