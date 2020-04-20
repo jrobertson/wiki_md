@@ -9,7 +9,6 @@ require 'dynarex-tags'
 class WikiMdReadError < Exception
 end
 
-
 class WikiMd
   include RXFHelperModule
   using ColouredText
@@ -99,9 +98,7 @@ class WikiMd
           .join("\n").debug
         puts ('file exists? ' + FileX.exists?(File.dirname(s)).inspect).debug
 
-      end      
-      
-     
+      end                 
       
       if type == :unknown and s.lines.length == 1 then 
           
@@ -130,7 +127,6 @@ class WikiMd
           validate(s)
         end
         
-
       
         raise WikiMdReadError, msg unless valid
         
@@ -248,7 +244,7 @@ class WikiMd
   def find(q, exact_match: false)
     
     puts ('WikiMd::find q: ' + q.inspect).debug if @debug
-    return Entry.new(@dxsx.dx.find q) if q =~ /^\d+$/
+    return Entry.new(@dxsx.dx.find(q), debug: @debug) if q =~ /^\d+$/
     
     regex = if q.is_a?(String) then      
       q.gsub!(/_/,' ')
@@ -267,7 +263,7 @@ class WikiMd
     return unless r
     
     heading2 = r.x.lines.last[/(?<=redirect ).*/]
-    heading2 ? find(heading2) : Entry.new(r)
+    heading2 ? find(heading2) : Entry.new(r, debug: @debug)
     
   end
   
@@ -462,11 +458,10 @@ EOF
                         .gsub(/-{2,}/,'-').gsub(/^-|-$/,'')]
         end
 
-        OpenStruct.new(heading: key + " (#{value.length})", body: body.join("\n"))
+        OpenStruct.new(heading: key + " (#{value.length})", 
+                       body: body.join("\n"), tag_goto: true)
         
-      end
-      
-      
+      end            
       
     end
     
@@ -481,8 +476,10 @@ EOF
 
       e = Rexle::Element.new('panel')
       e.add_attribute(title: x.heading)
+      e.add_attribute(class: 'entry') unless x.respond_to? :tag_goto
       puts 'x.body: ' + x.body.inspect if @debug
-      body = "<body>%s</body>" % Martile.new(x.body, ignore_domainlabel: @domain).to_html
+      body = "<body>%s</body>" % \
+          Martile.new(x.body, ignore_domainlabel: @domain).to_html
       Rexle.new(body).root.elements.each {|element| e.add element }
       
       doc.root.add e      
@@ -534,6 +531,8 @@ EOF
     
     puts '  q: ' + q.inspect if @debug
     @section = r = find(q)
+    puts 'r: ' + r.inspect if @debug
+    
     return false unless r
     
     content = val =~ /# / ? val : r.x.lines.first + "\n" + val
@@ -553,18 +552,22 @@ EOF
       content + "\n\n+ " + tagline1
     end    
     
+    puts 's2: ' + s2.inspect if @debug
     r.x = s2
 
     if rx then
       
       # update the index entry if the title or tags have been modified
       
+      puts 'before update_index' if @debug
       update_index(rx, tagline1, @active_heading)
       
       
     else
       
       # create a new index entry
+      
+      puts 'before new index entry' if @debug
       
       newtagline  = if tagline1 then
         tagline1.split.join(' #')
