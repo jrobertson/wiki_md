@@ -543,7 +543,7 @@ EOF
     else
       tagline1 = content.lines.first[/(?<=# )[^#]+(.*)/]\
           .scan(/(?<=#)\w+/).join(' ')
-      content = title + "\n" + content.lines[1..-1].join + "\n\n+ " +  tagline1
+      content = '# ' + title + "\n" + content.lines[1..-1].join + "\n\n+ " +  tagline1
     end
     
     rx = @dx.all.find {|x| x.title =~ /#{q}/}
