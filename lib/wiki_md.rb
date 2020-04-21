@@ -176,12 +176,19 @@ class WikiMd
   
   def create_section(s)
     
-    @active_heading = title = s[/(?<=^# ).*/]
+    @active_heading = title = s[/(?<=^# )[^#]+/].rstrip
 
     tagline = s.rstrip.lines.last[/(?<=^\+\s).*/]
-    
+        
     s2 = if tagline then
+    
       s
+      
+    elsif tagline.nil? and s.lines.first[/(?<=# )[^#]+#/] then
+      
+      tagline = s.lines.first[/(?<=# )[^#]+(.*)/].scan(/(?<=#)\w+/).join(' ')
+      '# ' + title + "\n" + s.lines[1..-1].join + "\n\n+ " + tagline
+      
     else
       a = title.split      
       tagline = a.length > 1 ? a.map(&:capitalize).join : a.first    
@@ -535,8 +542,10 @@ EOF
     
     return false unless r
     
-    content = val =~ /# / ? val : r.x.lines.first + "\n" + val
+    content = (val =~ /# / ? val : r.x.lines.first + "\n" + val).rstrip
     @active_heading = title = content.lines.first[/(?<=^# )[^#]+/].rstrip
+    
+    puts 'content: ' + content.inspect if @debug
     
     if content.lines.last[/^\+/] then
       tagline1 = content.lines.last[/^\+\s+(.*)/,1]    
@@ -551,7 +560,7 @@ EOF
     
     puts 'tagline1: ' + tagline1.inspect if @debug
     
-    s2 = if tagline1 then
+    s2 = if tagline1 and tagline1.length > 0 then
       content
     else
       a = title.split      
