@@ -38,6 +38,10 @@ class WikiMd
       self.x = a.join
     end    
     
+    def id()
+      @rx.id
+    end
+    
     def x=(s)
       @rx.x = s
       parse_x()
@@ -482,6 +486,7 @@ EOF
     rows.each do |x|
 
       e = Rexle::Element.new('panel')
+      e.add_attribute(entryid: x.id) if x.respond_to? :id
       e.add_attribute(title: x.heading)
       e.add_attribute(class: 'entry') unless x.respond_to? :tag_goto
       puts 'x.body: ' + x.body.inspect if @debug
