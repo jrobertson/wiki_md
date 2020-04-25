@@ -470,7 +470,7 @@ EOF
         end
 
         OpenStruct.new(heading: key + " (#{value.length})", 
-                       body: body.join("\n"), tag_goto: true)
+                       body: body.join("\n"), tag: key)
         
       end            
       
@@ -486,9 +486,16 @@ EOF
     rows.each do |x|
 
       e = Rexle::Element.new('panel')
-      e.add_attribute(entryid: x.id) if x.respond_to? :id
-      e.add_attribute(title: x.heading)
-      e.add_attribute(class: 'entry') unless x.respond_to? :tag_goto
+      
+      if x.respond_to? :id then
+        e.add_attribute(entryid: x.id) 
+        e.add_attribute(class: 'entry')
+      else
+        e.add_attribute(tag: x.tag)
+      end
+
+      e.add_attribute(title: x.heading)      
+      
       puts 'x.body: ' + x.body.inspect if @debug
       body = "<body>%s</body>" % \
           Martile.new(x.body, ignore_domainlabel: @domain).to_html
